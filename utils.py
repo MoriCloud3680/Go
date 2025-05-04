@@ -32,22 +32,16 @@ def save_recommended_numbers(round_no, numbers, tag):
     client = authenticate_google()
     sheet = client.open("Go").worksheet("F10")
     today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+    numbers_str = ",".join([f"{int(num):02d}" for num in numbers.split(",")])
     try:
-        sheet.append_row([today_date, round_no, tag, numbers])
-        print(f"Successfully saved: {today_date}, {round_no}, {tag}, {numbers}")
+        sheet.append_row([today_date, int(round_no), tag, numbers_str])
+        print(f"✅ Successfully saved: {today_date}, {round_no}, {tag}, {numbers_str}")
     except Exception as e:
-        print(f"Error saving to Google Sheet: {e}")
-    
-    # JSON 호환성 보장 (표준 int와 문자열만 사용)
-    round_no = int(round_no)  
-    numbers = ",".join(str(int(num)) for num in numbers.split(","))
-    
-    sheet.append_row([today_date, round_no, tag, numbers])
+        print(f"❌ Error saving to Google Sheet: {e}")
 
 # GA 모델 함수 (추천 번호 생성)
 def run_ga_model(actual_numbers):
-    actual_numbers = str(actual_numbers)
-    actual_pool = [int(actual_numbers[i:i+2]) for i in range(0, len(actual_numbers), 2)]
+    actual_pool = [int(n) for n in actual_numbers.split(",")]
     def fitness(combo):
         return len(set(combo) & set(actual_pool))
 
