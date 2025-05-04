@@ -32,6 +32,10 @@ def save_recommended_numbers(round_no, numbers, tag):
     client = authenticate_google()
     sheet = client.open("Go").worksheet("F10")
     today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+    try:
+        sheet.append_row([today_date, round_no, tag, numbers])
+    except Exception as e:
+        print(f"Error saving to Google Sheet: {e}")
     
     # JSON 호환성 보장 (표준 int와 문자열만 사용)
     round_no = int(round_no)  
