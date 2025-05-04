@@ -5,65 +5,98 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import random
 
-# Google 인증 및 클라이언트 생성
+# 구글 인증
 def authenticate_google():
-    scope = ['https://spreadsheets.google.com/feeds',
-             'https://www.googleapis.com/auth/spreadsheets',
-             'https://www.googleapis.com/auth/drive']
-
+    scope = [
+        'https://spreadsheets.google.com/feeds',
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
     creds_json = os.getenv("GOOGLE_CREDENTIALS")
     creds_dict = json.loads(creds_json)
-
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     return client
 
-# 최신회차 번호와 실제 번호 가져오기
+# 최신 실제 번호 가져오기 (Round 최신순)
 def get_latest_numbers():
     client = authenticate_google()
     sheet = client.open("Go").worksheet("Actual22")
-    data = sheet.get_all_records()
-
-    # 최신회차 번호로 구분
-    latest_row = max(data, key=lambda x: x['Round'])
+    df = pd.DataFrame(sheet.get_all_records())
+    df['Round'] = pd.to_numeric(df['Round'])
+    latest_row = df.loc[df['Round'].idxmax()]
     return latest_row['Round'], latest_row['Actual22']
 
-# 추천 번호 저장 (여러 조합 가능)
-def save_recommended_numbers(round_no, recommended_numbers_list):
+# 추천 번호 저장 (Google 시트)
+def save_recommended_numbers(round_no, numbers, tag):
     client = authenticate_google()
     sheet = client.open("Go").worksheet("F10")
     today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+    sheet.append_row([today_date, round_no, tag, numbers])
 
-    for numbers in recommended_numbers_list:
-        numbers_formatted = ",".join(f"{num:02d}" for num in numbers)
-        sheet.append_row([today_date, round_no, numbers_formatted])
-
-# GA 모델을 이용한 추천 번호 생성 (실제 구현)
+# GA 모델 함수 (추천 번호 생성)
 def run_ga_model(actual_numbers):
-    # actual_numbers가 int라면 str로 변환
-    if isinstance(actual_numbers, int):
-        actual_numbers = str(actual_numbers)
+    actual_pool = [int(n) for n in actual_numbers.split(",")]
 
-    # 콤마가 있으면 분리, 없으면 숫자 2자리씩 분리
-    if ',' in actual_numbers:
-        numbers_pool = [int(n) for n in actual_numbers.split(",")]
-    else:
-        numbers_pool = [int(actual_numbers[i:i+2]) for i in range(0, len(actual_numbers), 2)]
+    def fitness(combo):
+        return len(set(combo) & set(actual_pool))
 
-    # 실제 GA 로직 (간단 예시)
-    recommended_numbers = random.sample(numbers_pool, 10)
-    return recommended_numbers
+    def generate_combo():
+        return random.sample(range(1, 71), 10)
 
-# 여러 개의 추천번호 생성
-def generate_multiple_recommendations(actual_numbers, num_combinations=3):
-    recommendations = []
-    for _ in range(num_combinations):
-        combo = run_ga_model(actual_numbers)
-        recommendations.append(combo)
-    return recommendations
+    population_size = 100
+    generations = 30
+    mutation_rate = 0.1
+
+    population = [generate_combo() for _ in range(population_size)]
+
+    for _ in range(generations):
+        population.sort(key=fitness, reverse=True)
+        next_generation = population[:10]
+
+        while len(next_generation) < population_size:
+            parents = random.sample(population[:50], 2)
+            crossover_point = random.randint(1, 9)
+            child = parents[0][:crossover_point] + parents[1][crossover_point:]
+
+            if random.random() < mutation_rate:
+                mutation_index = random.randint(0, 9)
+                child[mutation_index] = random.randint(1, 70)
+
+            child = list(set(child))
+            while len(child) < 10:
+                new_num = random.randint(1, 70)
+                if new_num not in child:
+                    child.append(new_num)
+
+            next_generation.append(child)
+
+        population = next_generation
+
+    best_combination = max(population, key=fitness)
+    formatted_best = ",".join(sorted([f"{num:02d}" for num in best_combination]))
+
+    return formatted_best
+
+# 대안 조합 생성 (기존 추천과 다르게 생성)
+def generate_alternative(existing_combinations):
+    while True:
+        new_combo = random.sample(range(1, 71), 10)
+        formatted_new_combo = ",".join(sorted([f"{num:02d}" for num in new_combo]))
+        if formatted_new_combo not in existing_combinations:
+            return formatted_new_combo
 
 # Render에서 호출되는 메인 함수
 def update_after_input():
     round_no, actual_numbers = get_latest_numbers()
-    recommended_numbers_list = generate_multiple_recommendations(actual_numbers, num_combinations=3)
-    save_recommended_numbers(round_no + 1, recommended_numbers_list)
+
+    # 최적 조합 생성
+    recommended_numbers = run_ga_model(actual_numbers)
+    save_recommended_numbers(round_no + 1, recommended_numbers, "Best")
+
+    # 대안 조합 2개 생성
+    existing = {recommended_numbers}
+    for i in range(1, 3):
+        alt_combo = generate_alternative(existing)
+        save_recommended_numbers(round_no + 1, alt_combo, f"Alternative {i}")
+        existing.add(alt_combo)
