@@ -33,12 +33,13 @@ def save_recommended_numbers(round_no, numbers):
     today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
     sheet.append_row([today_date, round_no, numbers])
 
-# 실제 추천번호 생성 모델 로직
 def generate_recommendation(actual_numbers):
-    # 문자열 숫자 → 정수형 변환
-    numbers_list = [int(num) for num in actual_numbers.split(",")]
+    # 숫자로 넘어올 수 있으니 강제로 문자열로 변환
+    actual_numbers = str(actual_numbers)
 
-    # 여기에 네가 쓰는 실제 추천 로직(LSTM, GA 등)을 적용해야함
+    # 문자열 숫자 → 정수형 변환
+    numbers_list = [int(num.strip()) for num in actual_numbers.split(",")]
+
     # 임시 로직: 앞 10개 숫자만 선택
     recommended_10_numbers = numbers_list[:10]
 
@@ -46,6 +47,7 @@ def generate_recommendation(actual_numbers):
     recommended_10_numbers_str = [f"{num:02d}" for num in recommended_10_numbers]
 
     return ",".join(recommended_10_numbers_str)
+
 
 # Render에서 호출되는 주요 함수
 def update_after_input():
