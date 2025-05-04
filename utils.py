@@ -28,16 +28,21 @@ def get_latest_numbers():
     return latest_row['Round'], latest_row['Actual22']
 
 # 추천 번호 저장 (Google 시트)
-def save_recommended_numbers(round_no, numbers, tag):
+def get_latest_numbers():
     client = authenticate_google()
-    sheet = client.open("Go").worksheet("F10")
-    today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
-    numbers_str = ",".join([f"{int(num):02d}" for num in numbers.split(",")])
-    try:
-        sheet.append_row([today_date, int(round_no), tag, numbers_str])
-        print(f"✅ Successfully saved: {today_date}, {round_no}, {tag}, {numbers_str}")
-    except Exception as e:
-        print(f"❌ Error saving to Google Sheet: {e}")
+    sheet = client.open("Go").worksheet("Actual22")
+    df = pd.DataFrame(sheet.get_all_records())
+    df['Round'] = pd.to_numeric(df['Round'])
+    latest_row = df.loc[df['Round'].idxmax()]
+
+    actual_numbers = latest_row['Actual22']
+
+    # 추가적 안전장치 코드
+    if isinstance(actual_numbers, int) or isinstance(actual_numbers, float):
+        actual_numbers = str(int(actual_numbers)).zfill(44)  # 2자리씩 22개 숫자임
+        actual_numbers = ",".join([actual_numbers[i:i+2] for i in range(0, len(actual_numbers), 2)])
+
+    return latest_row['Round'], actual_numbers
 
 # GA 모델 함수 (추천 번호 생성)
 def run_ga_model(actual_numbers):
