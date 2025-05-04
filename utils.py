@@ -36,8 +36,8 @@ def save_recommended_numbers(round_no, numbers, tag):
 
 # GA 모델 함수 (추천 번호 생성)
 def run_ga_model(actual_numbers):
-    actual_pool = [int(n) for n in actual_numbers.split(",")]
-
+    actual_numbers = str(actual_numbers)
+    actual_pool = [int(actual_numbers[i:i+2]) for i in range(0, len(actual_numbers), 2)]
     def fitness(combo):
         return len(set(combo) & set(actual_pool))
 
