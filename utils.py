@@ -37,20 +37,18 @@ def get_latest_numbers():
 def save_recommended_numbers(round_no, numbers, tag):
     try:
         client = authenticate_google()
-        sheet = client.open("Go").worksheet("F10")
+        sheet_id = "<1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo>"  # 🔥 이 부분 정확히 넣어줘!
+        sheet = client.open_by_key(sheet_id).worksheet("F10")
         today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
 
-        # numbers가 리스트일 때 항상 안전하게 문자열로 변환
         if isinstance(numbers, list):
             numbers = ",".join([f"{int(num):02d}" for num in numbers])
         else:
-            # 이미 문자열이면 그냥 정리해서 사용
             numbers = ",".join([f"{int(num):02d}" for num in numbers.split(",")])
 
         round_no = int(round_no)
-        
-        sheet.append_row([today_date, round_no, tag, numbers])
 
+        sheet.append_row([today_date, round_no, tag, numbers])
         print(f"✅ 저장 성공: {today_date}, {round_no}, {tag}, {numbers}")
 
     except Exception as e:
