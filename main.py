@@ -1,6 +1,7 @@
 import os
 import json
 import gspread
+from flask import Flask  # <--- 이 줄이 빠지면 안돼
 from oauth2client.service_account import ServiceAccountCredentials
 
 app = Flask(__name__)
