@@ -35,15 +35,19 @@ def get_latest_numbers():
 
 # 추천 번호 저장 (Google 시트)
 def save_recommended_numbers(round_no, numbers, tag):
-    client = authenticate_google()
-    sheet = client.open("Go").worksheet("F10")
-    today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
-    
-    # 모든 데이터 표준 Python 타입으로 변환
-    round_no = int(round_no)
-    numbers = ",".join(str(int(num)) for num in numbers.split(","))
-    
-    sheet.append_row([today_date, round_no, tag, numbers])
+    try:
+        client = authenticate_google()
+        sheet = client.open("Go").worksheet("F10")
+        today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+        
+        round_no = int(round_no)
+        numbers = ",".join(str(int(num)) for num in numbers.split(","))
+        
+        sheet.append_row([today_date, round_no, tag, numbers])
+
+        print(f"✅ 저장 성공: {today_date}, {round_no}, {tag}, {numbers}")
+    except Exception as e:
+        print(f"❌ 저장 실패: {e}")
 
 # GA 모델 함수 (추천 번호 생성)
 def run_ga_model(actual_numbers):
