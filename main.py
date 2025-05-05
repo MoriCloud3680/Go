@@ -24,7 +24,7 @@ def fetch_current_round():
     client = authenticate_google()
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
     sheet = client.open_by_key(sheet_id).worksheet("Actual22")
-    round_no = int(sheet.acell('B2').value)
+    round_no = int(sheet.acell('B2').value) + 1  # 다음 회차 (+1)
     actual_numbers = sheet.acell('C2').value
     return round_no, actual_numbers
 
