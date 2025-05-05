@@ -10,9 +10,18 @@ last_generated_round = None
 
 # 👉 구글 인증 함수 (이미 사용중인 코드 유지해!)
 def authenticate_google():
-    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/spreadsheets']
-    creds = ServiceAccountCredentials.from_json_keyfile_name('key.json', scope)
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+    # 환경변수에서 JSON 키 로드
+    google_credentials_json = os.getenv('GOOGLE_CREDENTIALS')
+
+    # JSON 문자열을 dict로 파싱
+    credentials_dict = json.loads(google_credentials_json)
+
+    # 인증 설정
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     client = gspread.authorize(creds)
+
     return client
 
 # 👉 현재 최신 회차 가져오기 (B2 셀 기준)
