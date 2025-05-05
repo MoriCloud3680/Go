@@ -60,7 +60,7 @@ def save_recommended_numbers(round_no, numbers, tag):
 
         round_no = int(round_no)
 
-        sheet.append_row([today_date, round_no, tag, numbers], value_input_option="USER_ENTERED")
+        sheet.insert_row([today_date, round_no, tag, numbers], index=2, value_input_option="USER_ENTERED")
         print(f"✅ 저장 성공: {today_date}, {round_no}, {tag}, {numbers}")
 
     except Exception as e:
