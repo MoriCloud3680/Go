@@ -76,8 +76,9 @@ def run_ga_model(actual_numbers):
     def generate_combo():
         return random.sample(range(1, 71), 10)
 
-    population_size = 100
-    generations = 30
+    # 반복 횟수 임시적으로 감소 (성능테스트용 아님, 속도만 확인)
+    population_size = 20  # 원래는 100
+    generations = 5       # 원래는 30
     mutation_rate = 0.1
 
     population = [generate_combo() for _ in range(population_size)]
@@ -87,7 +88,7 @@ def run_ga_model(actual_numbers):
         next_generation = population[:10]
 
         while len(next_generation) < population_size:
-            parents = random.sample(population[:50], 2)
+            parents = random.sample(population[:10], 2)  
             crossover_point = random.randint(1, 9)
             child = parents[0][:crossover_point] + parents[1][crossover_point:]
 
