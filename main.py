@@ -26,10 +26,13 @@ def authenticate_google():
 def get_latest_numbers():
     client = authenticate_google()
     sheet = client.open("Go").worksheet("Actual22")
-    df = pd.DataFrame(sheet.get_all_records())
+    
+    data = sheet.get_all_values()
+    df = pd.DataFrame(data[1:], columns=data[0])  # 명시적으로 헤더를 첫 행으로 설정
+    
     df['Round'] = pd.to_numeric(df['Round'], errors='coerce')
     df.dropna(subset=['Round'], inplace=True)
-    
+
     latest_row = df.loc[df['Round'].idxmax()]
 
     actual_numbers = latest_row['Actual22']
@@ -38,7 +41,7 @@ def get_latest_numbers():
 
     actual_numbers = str(actual_numbers).replace(" ", "")
     if len(actual_numbers.split(",")) != 22:
-        raise ValueError("Actual22 번호 개수가 22개가 아닙니다.")
+        raise ValueError(f"Actual22 번호 개수가 22개가 아닙니다. 실제 데이터: '{actual_numbers}'")
 
     return int(latest_row['Round']), actual_numbers
 
