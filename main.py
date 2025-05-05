@@ -138,9 +138,28 @@ app = Flask(__name__)
 @app.route("/", methods=["GET"])
 def home():
     try:
-        update_after_input()
+        print("📌 [시작] update_after_input() 실행 시작")
+        round_no, actual_numbers = get_latest_numbers()
+        print(f"✅ [데이터 획득] 최신 라운드: {round_no}, 번호: {actual_numbers}")
+
+        recommended_numbers = run_ga_model(actual_numbers)
+        print(f"✅ [추천번호 생성] Best: {recommended_numbers}")
+
+        save_recommended_numbers(round_no + 1, recommended_numbers, "Best")
+        print(f"✅ [저장 성공] Best 조합 저장 완료")
+
+        existing = {",".join([f"{num:02d}" for num in recommended_numbers])}
+        for i in range(1, 3):
+            alt_combo = generate_alternative(existing)
+            print(f"✅ [대안 조합 생성] Alternative {i}: {alt_combo}")
+            save_recommended_numbers(round_no + 1, alt_combo, f"Alternative {i}")
+            print(f"✅ [저장 성공] Alternative {i} 저장 완료")
+            existing.add(",".join([f"{num:02d}" for num in alt_combo]))
+
         return "GA 모델이 성공적으로 실행되었습니다.", 200
+
     except Exception as e:
+        print(f"🚨 [오류발생]: {str(e)}")
         return f"GA 모델 실행 중 오류 발생: {str(e)}", 500
 
 # 👉 디버그용 추가 라우트 (아래 코드 추가!)
