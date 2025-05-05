@@ -37,7 +37,7 @@ def get_latest_numbers():
 def save_recommended_numbers(round_no, numbers, tag):
     try:
         client = authenticate_google()
-        sheet_id = "<1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo>"  # 🔥 이 부분 정확히 넣어줘!
+        sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"  # 🔥 이 부분 정확히 넣어줘!
         sheet = client.open_by_key(sheet_id).worksheet("F10")
         today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
 
