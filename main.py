@@ -29,13 +29,22 @@ def fetch_current_round():
     actual_numbers = sheet.acell('C2').value
     return round_no, actual_numbers
 
-# 기존방식 prev_best (랜덤 10개 추출)
+# Prev Best (직전회차 번호에서 랜덤 10개 추출)
 def prev_best(actual_numbers):
     numbers_pool = [int(n) for n in actual_numbers.split(",")]
     selected_numbers = sorted(random.sample(numbers_pool, 10))
     return ",".join([f"{num:02d}" for num in selected_numbers])
 
-# GA Best (최근 5회차 가장 많이 나온 번호 기반)
+# GA Best (직전회차 번호 5개 고정 + 랜덤 5개)
+def ga_best(actual_numbers):
+    recent_nums = [int(n) for n in actual_numbers.split(",")]
+    fixed_nums = random.sample(recent_nums, 5)
+    remaining_pool = [n for n in range(1, 71) if n not in fixed_nums]
+    random_nums = random.sample(remaining_pool, 5)
+    combined_nums = sorted(fixed_nums + random_nums)
+    return ",".join([f"{num:02d}" for num in combined_nums])
+
+# GA Recent5 Best (최근 5회차 최다 빈도 10개 번호)
 def ga_recent_best():
     client = authenticate_google()
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
@@ -48,15 +57,6 @@ def ga_recent_best():
     top_numbers = sorted(num_freq, key=num_freq.get, reverse=True)[:10]
     top_numbers = sorted([int(n) for n in top_numbers])
     return ",".join([f"{num:02d}" for num in top_numbers])
-
-# GA Best (기존 방식: 최근 1회차 고정 번호로 하고 나머지 랜덤)
-def ga_best(actual_numbers):
-    recent_nums = [int(n) for n in actual_numbers.split(",")]
-    fixed_nums = random.sample(recent_nums, 5)
-    remaining_pool = [n for n in range(1, 71) if n not in fixed_nums]
-    random_nums = random.sample(remaining_pool, 5)
-    combined_nums = sorted(fixed_nums + random_nums)
-    return ",".join([f"{num:02d}" for num in combined_nums])
 
 # 시트 업데이트 함수
 def update_recommendations(round_no, numbers, tag):
@@ -71,25 +71,26 @@ def home():
     global last_generated_round
 
     current_round, actual_numbers = fetch_current_round()
+    next_round = current_round + 1  # 여기서 +1 처리
 
-    if current_round != last_generated_round:
+    if next_round != last_generated_round:
         try:
-            # 딱 3개 조합만 생성 (prev_best, GA best, GA recent5 best)
+            # 정확히 3가지 조합만 생성
             pb_numbers = prev_best(actual_numbers)
             ga_numbers = ga_best(actual_numbers)
             ga_recent_numbers = ga_recent_best()
 
-            update_recommendations(current_round, pb_numbers, "Prev Best")
-            update_recommendations(current_round, ga_numbers, "GA Best")
-            update_recommendations(current_round, ga_recent_numbers, "GA Recent5 Best")
+            update_recommendations(next_round, pb_numbers, "Prev Best")
+            update_recommendations(next_round, ga_numbers, "GA Best")
+            update_recommendations(next_round, ga_recent_numbers, "GA Recent5 Best")
 
-            last_generated_round = current_round
+            last_generated_round = next_round
 
-            return f"✅ {current_round}회차 조합 생성 완료.", 200
+            return f"✅ {next_round}회차 조합 생성 완료.", 200
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
     else:
-        return f"⚠️ {current_round}회차는 이미 처리됨.", 200
+        return f"⚠️ {next_round}회차는 이미 처리됨.", 200
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)
