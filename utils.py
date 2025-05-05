@@ -4,6 +4,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import random
+from flask import Flask
 
 # 구글 인증
 def authenticate_google():
@@ -48,7 +49,7 @@ def save_recommended_numbers(round_no, numbers, tag):
 
         round_no = int(round_no)
 
-        sheet.append_row([today_date, round_no, tag, numbers])
+        sheet.append_row([today_date, round_no, tag, numbers], value_input_option="USER_ENTERED")
         print(f"✅ 저장 성공: {today_date}, {round_no}, {tag}, {numbers}")
 
     except Exception as e:
@@ -121,3 +122,14 @@ def update_after_input():
         alt_combo = generate_alternative(existing)
         save_recommended_numbers(round_no + 1, alt_combo, f"Alternative {i}")
         existing.add(alt_combo)
+
+# Flask 앱 설정
+app = Flask(__name__)
+
+@app.route("/", methods=["GET"])
+def home():
+    update_after_input()
+    return "GA 모델이 성공적으로 실행되었습니다.", 200
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=10000)
