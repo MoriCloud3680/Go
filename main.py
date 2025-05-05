@@ -142,5 +142,18 @@ def home():
     except Exception as e:
         return f"GA 모델 실행 중 오류 발생: {str(e)}", 500
 
+# 👉 디버그용 추가 라우트 (아래 코드 추가!)
+@app.route("/debug_sheet")
+def debug_sheet():
+    try:
+        client = authenticate_google()
+        sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
+        sheet = client.open_by_key(sheet_id).worksheet("F10")
+        sheet.append_row(["2025-05-05", "999999", "DebugTest", "01,02,03,04,05"], value_input_option="USER_ENTERED")
+        return "✅ 직접 추가 성공", 200
+    except Exception as e:
+        return f"❌ 직접 추가 실패: {str(e)}", 500
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.getenv("PORT", 10000)))
+
