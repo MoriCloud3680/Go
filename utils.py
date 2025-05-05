@@ -39,13 +39,20 @@ def save_recommended_numbers(round_no, numbers, tag):
         client = authenticate_google()
         sheet = client.open("Go").worksheet("F10")
         today_date = pd.Timestamp.now().strftime("%Y-%m-%d")
-        
+
+        # numbers가 리스트일 때 항상 안전하게 문자열로 변환
+        if isinstance(numbers, list):
+            numbers = ",".join([f"{int(num):02d}" for num in numbers])
+        else:
+            # 이미 문자열이면 그냥 정리해서 사용
+            numbers = ",".join([f"{int(num):02d}" for num in numbers.split(",")])
+
         round_no = int(round_no)
-        numbers = ",".join(str(int(num)) for num in numbers.split(","))
         
         sheet.append_row([today_date, round_no, tag, numbers])
 
         print(f"✅ 저장 성공: {today_date}, {round_no}, {tag}, {numbers}")
+
     except Exception as e:
         print(f"❌ 저장 실패: {e}")
 
