@@ -1,0 +1,27 @@
+name: Render Daily Scheduler
+
+on:
+  schedule:
+    - cron: "0 22 * * *"  # 한국시간 오전 7시
+    - cron: "0 15 * * *"  # 한국시간 밤 12시
+
+jobs:
+  manage-render-app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Render App Scheduler
+        run: |
+          CURRENT_HOUR=$(date +'%H')
+          if [ "$CURRENT_HOUR" == "22" ]; then
+            echo "Starting Render App..."
+            curl -X POST \
+              -H "Accept: application/json" \
+              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+              https://api.render.com/v1/services/<rnd_J6dAAljYK9Z09S5wVW1HRucwfI9R>/resume
+          elif [ "$CURRENT_HOUR" == "15" ]; then
+            echo "Stopping Render App..."
+            curl -X POST \
+              -H "Accept: application/json" \
+              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+              https://api.render.com/v1/services/<rnd_J6dAAljYK9Z09S5wVW1HRucwfI9R>/suspend
+          fi
