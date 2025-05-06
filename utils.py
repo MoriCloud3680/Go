@@ -36,3 +36,11 @@ def update_recommendations(round_no, numbers, tag):
     f10_sheet = client.open_by_key(sheet_id).worksheet("F10")
     today_date = datetime.now().strftime('%Y-%m-%d')
     f10_sheet.insert_row([today_date, round_no, tag, numbers], 2, value_input_option="USER_ENTERED")
+
+# 해당 회차에 추천 조합이 이미 있는지 확인
+def is_round_processed(round_no):
+    client = authenticate_google()
+    sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
+    f10_sheet = client.open_by_key(sheet_id).worksheet("F10")
+    existing_rounds = f10_sheet.col_values(2)  # B열(Round) 데이터 가져오기
+    return str(round_no) in existing_rounds
