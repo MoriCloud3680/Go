@@ -1,28 +1,44 @@
-from flask import Flask
-from utils import fetch_current_round, prev_best, update_recommendations, is_round_processed
+import os
+import json
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
+from utils import real_ga_optimized
 
-app = Flask(__name__)
+# 구글 인증
+def authenticate_google():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    google_credentials_json = os.getenv('GOOGLE_CREDENTIALS')
+    credentials_dict = json.loads(google_credentials_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+    return gspread.authorize(creds)
 
-@app.route("/", methods=["GET"])
-def home():
+# 최신회차 데이터 불러오기
+def fetch_current_round():
+    client = authenticate_google()
+    sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
+    sheet = client.open_by_key(sheet_id).worksheet("Actual22")
+    round_no = int(sheet.acell('B2').value)
+    actual_numbers = sheet.acell('C2').value
+    return round_no, actual_numbers
+
+# 시트 업데이트 함수
+def update_recommendation(round_no, numbers, tag):
+    client = authenticate_google()
+    sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
+    f10_sheet = client.open_by_key(sheet_id).worksheet("F10")
+    today_date = datetime.now().strftime('%Y-%m-%d')
+    f10_sheet.insert_row([today_date, round_no, tag, numbers], 2, value_input_option="USER_ENTERED")
+
+def main():
     current_round, actual_numbers = fetch_current_round()
     next_round = current_round + 1
 
-    # 이미 처리된 회차면 생성하지 않음
-    if is_round_processed(next_round):
-        return f"⚠️ {next_round}회차는 이미 생성된 회차입니다.", 200
+    # 딱 1개 조합만 생성 후 종료
+    optimized_numbers = real_ga_optimized(actual_numbers)
+    update_recommendation(next_round, optimized_numbers, "Real GA Optimized")
 
-    try:
-        # 단 하나의 Prev Best 조합만 생성
-        main_combo = prev_best(actual_numbers)
-
-        # 구글 시트에 기록
-        update_recommendations(next_round, main_combo, "Prev Best Main")
-
-        return f"✅ {next_round}회차 Prev Best Main 조합 생성 완료: {main_combo}", 200
-
-    except Exception as e:
-        return f"❌ 오류 발생: {str(e)}", 500
+    print(f"✅ {next_round}회차 Real GA Optimized 조합 생성 완료: {optimized_numbers}")
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+    main()
