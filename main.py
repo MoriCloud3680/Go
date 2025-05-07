@@ -20,13 +20,16 @@ def authenticate_google():
     client = gspread.authorize(creds)
     return client
 
-# 최신 회차 데이터 불러오기
+# 최신 회차 데이터 불러오기 (셀 참조 수정됨)
 def fetch_current_round():
     client = authenticate_google()
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
     sheet = client.open_by_key(sheet_id).worksheet("Actual22")
-    round_no = int(sheet.acell('B2').value)
-    actual_numbers = sheet.acell('C2').value.replace(" ", "")  # 공백 제거 추가
+    
+    # 셀 위치 수정됨 (중요!)
+    round_no = int(sheet.acell('C2').value)
+    actual_numbers = sheet.acell('B2').value.replace(" ", "")
+    
     return round_no, actual_numbers
 
 # GA 모델 실행 및 최적화된 번호 생성
