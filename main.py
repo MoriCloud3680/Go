@@ -21,7 +21,7 @@ def authenticate_google():
 def fetch_recent_rounds():
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
-    recent_numbers = sheet.get('C2:C4')  # 최근 3개 회차
+    recent_numbers = sheet.get('B2:B4')  # 최근 3개 회차
 
     # 빈 행 또는 비정상 데이터 필터링
     valid_numbers = []
