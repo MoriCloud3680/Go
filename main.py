@@ -32,7 +32,7 @@ def get_last_confirmed_round():
 def update_last_confirmed_round(round_no):
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Status")
-    sheet.update('A2', str(round_no))
+    sheet.update('A2', [[str(round_no)]])  # 수정된 부분
 
 def update_recommendation(round_no, tag, numbers):
     client = authenticate_google()
