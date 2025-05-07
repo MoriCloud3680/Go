@@ -1,6 +1,7 @@
 import os
 import json
 import gspread
+import random
 from oauth2client.service_account import ServiceAccountCredentials
 
 # 구글 인증
