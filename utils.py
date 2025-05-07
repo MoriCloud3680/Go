@@ -10,8 +10,8 @@ def real_ga_optimized(actual_numbers):
     def generate_combo():
         return random.sample(range(1, 71), 10)
 
-    population_size = 150  # 대폭 증가
-    generations = 40       # 대폭 증가
+    population_size = 200  # 대폭 증가
+    generations = 50       # 대폭 증가
     mutation_rate = 0.1
 
     # 초기 population 생성
