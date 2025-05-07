@@ -25,8 +25,8 @@ def fetch_current_round():
     client = authenticate_google()
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
     sheet = client.open_by_key(sheet_id).worksheet("Actual22")
-    round_no = int(sheet.acell('B2').value)
-    actual_numbers = sheet.acell('C2').value.replace(" ", "")
+    round_no = int(sheet.acell('A2').value)
+    actual_numbers = sheet.acell('B2').value.replace(" ", "")
     return round_no, actual_numbers
 
 # Adaptive GA 모델 (중복방지 및 홀짝 비율 추가)
