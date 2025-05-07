@@ -22,8 +22,17 @@ def fetch_recent_rounds():
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
     recent_numbers = sheet.get('C2:C4')  # 최근 3개 회차
-    recent_numbers = [set(map(int, row[0].split(','))) for row in recent_numbers]
-    return recent_numbers
+
+    # 빈 행 또는 비정상 데이터 필터링
+    valid_numbers = []
+    for row in recent_numbers:
+        if row and row[0]:  # 데이터가 존재하고 비어있지 않다면
+            valid_numbers.append(set(map(int, row[0].split(','))))
+
+    if len(valid_numbers) < 2:
+        raise ValueError("충분한 유효한 회차 데이터가 없습니다. 최소 2회차 필요.")
+
+    return valid_numbers
 
 # 평균 중복 개수 구하기
 def average_overlap(recent_numbers):
