@@ -2,9 +2,9 @@ import os
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import random
+from datetime import datetime
 
-# Google 인증
+# 구글 인증 함수
 def authenticate_google():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     google_credentials_json = os.getenv('GOOGLE_CREDENTIALS')
@@ -13,59 +13,34 @@ def authenticate_google():
     client = gspread.authorize(creds)
     return client
 
-# 최신 회차 데이터 가져오기
+# 최신 회차 번호 가져오기
 def fetch_current_round():
     client = authenticate_google()
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
     sheet = client.open_by_key(sheet_id).worksheet("Actual22")
-    round_no = int(sheet.acell('A2').value)
-    actual_numbers = sheet.acell('B2').value
-    hot_numbers = [int(n) for n in sheet.acell('C2').value.split(",")]
-    cold_numbers = [int(n) for n in sheet.acell('D2').value.split(",")]
-    return round_no, actual_numbers, hot_numbers, cold_numbers
+    round_no = int(sheet.acell('B2').value)
+    return round_no
 
-# 구글시트 업데이트 (날짜 제외)
+# 최근 5회차의 최다 출현 번호 계산
+def ga_recent_best():
+    client = authenticate_google()
+    sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
+    sheet = client.open_by_key(sheet_id).worksheet("Actual22")
+    recent_data = sheet.get('C2:C6')  # 최근 5개 회차
+
+    num_freq = {}
+    for data in recent_data:
+        numbers = data[0].replace(" ", "").split(",")
+        for num in numbers:
+            num_freq[num] = num_freq.get(num, 0) + 1
+
+    top_numbers = sorted(num_freq, key=num_freq.get, reverse=True)[:10]
+    return ",".join(sorted(top_numbers, key=lambda x: int(x)))
+
+# 결과를 시트에 업데이트
 def update_recommendations(round_no, numbers, tag):
     client = authenticate_google()
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
     f10_sheet = client.open_by_key(sheet_id).worksheet("F10")
+    # 날짜 없이 기록
     f10_sheet.insert_row([round_no, tag, numbers], 2, value_input_option="USER_ENTERED")
-
-# Real GA Optimized (Hot/Cold) 전략
-def real_ga_optimized(hot_numbers, cold_numbers):
-    population_size = 200
-    generations = 100
-    mutation_rate = 0.1
-
-    def generate_individual():
-        combo = random.sample(hot_numbers, 4) + random.sample(cold_numbers, 2)
-        remaining_pool = [n for n in range(1, 71) if n not in combo]
-        combo += random.sample(remaining_pool, 4)
-        return sorted(combo)
-
-    population = [generate_individual() for _ in range(population_size)]
-
-    for _ in range(generations):
-        next_generation = population[:10]
-        while len(next_generation) < population_size:
-            parents = random.sample(population[:20], 2)
-            crossover_point = random.randint(1, 8)
-            child = parents[0][:crossover_point] + parents[1][crossover_point:]
-
-            if random.random() < mutation_rate:
-                mutation_index = random.randint(0, 9)
-                mutation_pool = list(set(range(1, 71)) - set(child))
-                child[mutation_index] = random.choice(mutation_pool)
-
-            child = sorted(list(set(child)))
-            while len(child) < 10:
-                new_num = random.randint(1, 70)
-                if new_num not in child:
-                    child.append(new_num)
-
-            next_generation.append(child)
-
-        population = next_generation
-
-    best_combination = sorted(random.choice(population[:5]))  # 상위 5개 중 랜덤 선택
-    return ",".join(f"{num:02d}" for num in best_combination)
