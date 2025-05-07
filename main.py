@@ -17,13 +17,12 @@ def authenticate_google():
     client = gspread.authorize(creds)
     return client
 
-# ✅ 핫/콜드 번호 추가해서 불러오기
 def fetch_current_round():
     client = authenticate_google()
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
     sheet = client.open_by_key(sheet_id).worksheet("Actual22")
 
-    round_no = int(sheet.acell('A2').value)
+    round_no = int(sheet.acell('A2').value)  # ⬅️ 여기 A2로 수정
     actual_numbers = sheet.acell('B2').value.replace(" ", "")
     hot_numbers = sheet.acell('C2').value.replace(" ", "")
     cold_numbers = sheet.acell('D2').value.replace(" ", "")
