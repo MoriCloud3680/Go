@@ -3,7 +3,6 @@ from utils import fetch_current_round, ga_recent_best, update_recommendations
 
 app = Flask(__name__)
 
-# 전역변수로 최근 생성한 회차 기록
 last_generated_round = None
 
 @app.route("/", methods=["GET"])
@@ -13,17 +12,12 @@ def home():
     current_round = fetch_current_round()
     next_round = current_round + 1
 
-    # 회차가 중복 생성되지 않도록 체크
     if next_round != last_generated_round:
         try:
             recent_best_numbers = ga_recent_best()
-
             update_recommendations(next_round, recent_best_numbers, "GA Recent5 Best")
-
             last_generated_round = next_round
-
             return f"✅ {next_round}회차 GA Recent5 Best 조합 생성 완료.", 200
-
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
     else:
