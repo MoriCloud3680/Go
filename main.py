@@ -40,8 +40,8 @@ def ga_single_optimized(actual_numbers):
         return random.sample(range(1, 71), 10)
 
     # 최적화된 변수
-    population_size = 150
-    generations = 40
+    population_size = 200
+    generations = 50
     mutation_rate = 0.1
 
     population = [generate_combo() for _ in range(population_size)]
