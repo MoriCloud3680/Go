@@ -1,117 +1,76 @@
 import os
 import json
+import random
 import gspread
 from flask import Flask
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import random
 
 app = Flask(__name__)
 
-# 전역변수로 최근 생성한 회차 기록
-last_generated_round = None
-
-# Google 인증 함수
+# 구글 시트 인증
 def authenticate_google():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    google_credentials_json = os.getenv('GOOGLE_CREDENTIALS')
-    credentials_dict = json.loads(google_credentials_json)
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+    creds_json = os.getenv('GOOGLE_CREDENTIALS')
+    creds_dict = json.loads(creds_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     return client
 
-# 최신 회차 데이터 불러오기
-def fetch_current_round():
+# 최근 3회차 번호 가져오기
+def fetch_recent_rounds():
     client = authenticate_google()
-    sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
-    sheet = client.open_by_key(sheet_id).worksheet("Actual22")
-    round_no = int(sheet.acell('A2').value)
-    actual_numbers = sheet.acell('B2').value.replace(" ", "")
-    return round_no, actual_numbers
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
+    recent_numbers = sheet.get('C2:C4')  # 최근 3개 회차
+    recent_numbers = [set(map(int, row[0].split(','))) for row in recent_numbers]
+    return recent_numbers
 
-# Adaptive GA 모델 (중복방지 및 홀짝 비율 추가)
-def run_adaptive_ga(actual_numbers):
-    actual_pool = [int(n) for n in actual_numbers.split(",")]
+# 평균 중복 개수 구하기
+def average_overlap(recent_numbers):
+    overlaps = [
+        len(recent_numbers[i] & recent_numbers[i+1]) for i in range(len(recent_numbers)-1)
+    ]
+    return sum(overlaps) / len(overlaps)
 
-    def fitness(combo):
-        return len(set(combo) & set(actual_pool))
+# 중복 숫자 개수 결정
+def determine_overlap_count(avg_overlap):
+    if avg_overlap >= 9:
+        return 7
+    elif avg_overlap >= 7:
+        return 6
+    elif avg_overlap >= 5:
+        return 5
+    else:
+        return random.choice([3,4])
 
-    def generate_combo():
-        while True:
-            combo = random.sample(range(1, 71), 10)
-            odd = len([num for num in combo if num % 2 == 1])
-            even = 10 - odd
-            if odd >= 3 and even >= 3:
-                return combo
+# GA 조합 생성
+def adaptive_overlap_ga(prev_numbers, overlap_count):
+    fixed_nums = random.sample(prev_numbers, overlap_count)
+    remaining_pool = [num for num in range(1, 71) if num not in fixed_nums]
+    additional_nums = random.sample(remaining_pool, 10 - overlap_count)
+    return sorted(fixed_nums + additional_nums)
 
-    population_size = 150
-    generations = 50
-    mutation_rate = 0.1
-
-    population = [generate_combo() for _ in range(population_size)]
-
-    for _ in range(generations):
-        population.sort(key=fitness, reverse=True)
-        next_generation = population[:10]
-
-        while len(next_generation) < population_size:
-            parents = random.sample(population[:20], 2)
-            crossover_point = random.randint(1, 9)
-            child = parents[0][:crossover_point] + parents[1][crossover_point:]
-
-            # mutation
-            if random.random() < mutation_rate:
-                mutation_index = random.randint(0, 9)
-                new_number = random.randint(1, 70)
-                while new_number in child:
-                    new_number = random.randint(1, 70)
-                child[mutation_index] = new_number
-
-            # 중복 방지
-            child = list(dict.fromkeys(child))
-            while len(child) < 10:
-                new_num = random.randint(1, 70)
-                if new_num not in child:
-                    child.append(new_num)
-
-            # 홀짝 비율 제한 (최소 3홀/3짝)
-            odd = len([num for num in child if num % 2 == 1])
-            even = 10 - odd
-            if odd >= 3 and even >= 3:
-                next_generation.append(child)
-
-        population = next_generation
-
-    best_combination = max(population, key=fitness)
-    return sorted(best_combination)
-
-# Google Sheets에 업데이트
+# 시트에 결과 업데이트
 def update_recommendations(round_no, numbers, tag):
     client = authenticate_google()
-    sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
-    f10_sheet = client.open_by_key(sheet_id).worksheet("F10")
-    f10_sheet.insert_row([round_no, tag, numbers], 2, value_input_option="USER_ENTERED")
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("F10")
+    formatted_numbers = ','.join(f"{n:02d}" for n in numbers)
+    sheet.insert_row([round_no, tag, formatted_numbers], 2, value_input_option="USER_ENTERED")
 
+# 메인 라우트
 @app.route("/", methods=["GET"])
 def home():
-    global last_generated_round
+    recent_numbers = fetch_recent_rounds()
+    avg_overlap = average_overlap(recent_numbers)
+    overlap_count = determine_overlap_count(avg_overlap)
+    
+    prev_round_numbers = recent_numbers[0]
+    ga_numbers = adaptive_overlap_ga(list(prev_round_numbers), overlap_count)
 
-    current_round, actual_numbers = fetch_current_round()
-    next_round = current_round + 1
+    next_round = datetime.now().strftime('%Y%m%d%H%M')  # 날짜와 시간으로 유니크 회차 번호
+    update_recommendations(next_round, ga_numbers, "Adaptive Overlap GA")
 
-    if next_round != last_generated_round:
-        try:
-            ga_numbers = run_adaptive_ga(actual_numbers)
-            formatted_ga_numbers = ",".join([f"{num:02d}" for num in ga_numbers])
-
-            update_recommendations(next_round, formatted_ga_numbers, "Adaptive GA Optimized")
-            last_generated_round = next_round
-
-            return f"✅ {next_round}회차 조합 생성 완료.", 200
-        except Exception as e:
-            return f"❌ 오류 발생: {str(e)}", 500
-    else:
-        return f"⚠️ {next_round}회차는 이미 처리됨.", 200
+    return f"✅ Adaptive Overlap GA 생성 완료 ({next_round}): {ga_numbers}"
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+    app.run(host="0.0.0.0", port=10000)
