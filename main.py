@@ -4,11 +4,13 @@ import gspread
 from flask import Flask
 from oauth2client.service_account import ServiceAccountCredentials
 import random
+from functools import lru_cache
 
 app = Flask(__name__)
-
 last_generated_round = None
 
+# Google 인증을 한 번만 수행 (캐싱)
+@lru_cache(maxsize=1)
 def authenticate_google():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     credentials_dict = json.loads(os.getenv('GOOGLE_CREDENTIALS'))
@@ -18,37 +20,40 @@ def authenticate_google():
 def fetch_latest_rounds(n=3):
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
-    rounds_data = sheet.get(f'A2:B{n+1}')
-    rounds_numbers = [list(map(int, row[1].replace(" ", "").split(","))) for row in rounds_data if len(row) > 1]
-    current_round = int(rounds_data[0][0])
+    data = sheet.get(f'A2:B{n+1}')
+    rounds_numbers = [list(map(int, row[1].replace(" ", "").split(","))) for row in data if len(row) > 1]
+    current_round = int(data[0][0])
     return current_round, rounds_numbers
 
-# fitness 함수도 직전 3개 회차 반영하도록 수정
+def update_recommendation(round_no, tag, numbers):
+    client = authenticate_google()
+    f10_sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("F10")
+    numbers_str = ",".join(map(str, numbers))
+    f10_sheet.insert_row([round_no, tag, numbers_str], 2, value_input_option="USER_ENTERED")
+
 def adaptive_overlap_ga(previous_numbers_sets):
     all_prev_nums = set().union(*previous_numbers_sets)
 
     def fitness(candidate):
-        overlap = len(set(candidate) & all_prev_nums)
-        return -abs(5 - overlap)  
+        return -abs(5 - len(set(candidate) & all_prev_nums))
 
-    population_size = 200
-    generations = 50
-    mutation_rate = 0.1
+    population_size = 100  # 성능을 위해 축소
+    generations = 30       # 성능을 위해 축소
+    mutation_rate = 0.05   # 성능 최적화
 
     def generate_candidate():
-        overlap_count = random.randint(4, 6)
-        overlap_nums = random.sample(list(all_prev_nums), overlap_count)
-        remaining_nums = random.sample([n for n in range(1, 71) if n not in overlap_nums], 10 - overlap_count)
+        overlap_nums = random.sample(list(all_prev_nums), random.randint(4, 6))
+        remaining_nums = random.sample([n for n in range(1, 71) if n not in overlap_nums], 10 - len(overlap_nums))
         return sorted(overlap_nums + remaining_nums)
 
     population = [generate_candidate() for _ in range(population_size)]
 
     for _ in range(generations):
         population.sort(key=fitness, reverse=True)
-        next_generation = population[:20]
+        next_generation = population[:10]
 
         while len(next_generation) < population_size:
-            parents = random.sample(population[:50], 2)
+            parents = random.sample(population[:30], 2)
             cross_point = random.randint(3, 7)
             child = parents[0][:cross_point] + parents[1][cross_point:]
             child = list(set(child))
@@ -70,6 +75,7 @@ def adaptive_overlap_ga(previous_numbers_sets):
 @app.route("/", methods=["GET"])
 def home():
     global last_generated_round
+
     current_round, previous_numbers_sets = fetch_latest_rounds()
     next_round = current_round + 1
 
