@@ -7,9 +7,7 @@ import random
 from functools import lru_cache
 
 app = Flask(__name__)
-last_generated_round = None
 
-# Google 인증을 한 번만 수행 (캐싱)
 @lru_cache(maxsize=1)
 def authenticate_google():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -25,6 +23,17 @@ def fetch_latest_rounds(n=3):
     current_round = int(data[0][0])
     return current_round, rounds_numbers
 
+def get_last_generated_round():
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Status")
+    last_round = sheet.acell('A2').value
+    return int(last_round) if last_round else 0
+
+def update_last_generated_round(round_no):
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Status")
+    sheet.update('A2', str(round_no))
+
 def update_recommendation(round_no, tag, numbers):
     client = authenticate_google()
     f10_sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("F10")
@@ -35,14 +44,20 @@ def adaptive_overlap_ga(previous_numbers_sets):
     all_prev_nums = set().union(*previous_numbers_sets)
 
     def fitness(candidate):
-        return -abs(5 - len(set(candidate) & all_prev_nums))
+        overlap = len(set(candidate) & all_prev_nums)
+        if overlap < 4:
+            return -10
+        elif overlap > 6:
+            return -5
+        else:
+            return overlap
 
-    population_size = 100  # 성능을 위해 축소
-    generations = 30       # 성능을 위해 축소
-    mutation_rate = 0.05   # 성능 최적화
+    population_size = 150
+    generations = 40
+    mutation_rate = 0.1
 
     def generate_candidate():
-        overlap_nums = random.sample(list(all_prev_nums), random.randint(4, 6))
+        overlap_nums = random.sample(list(all_prev_nums), random.choice([4, 5, 6]))
         remaining_nums = random.sample([n for n in range(1, 71) if n not in overlap_nums], 10 - len(overlap_nums))
         return sorted(overlap_nums + remaining_nums)
 
@@ -74,16 +89,15 @@ def adaptive_overlap_ga(previous_numbers_sets):
 
 @app.route("/", methods=["GET"])
 def home():
-    global last_generated_round
-
     current_round, previous_numbers_sets = fetch_latest_rounds()
     next_round = current_round + 1
+    last_generated_round = get_last_generated_round()
 
     if next_round != last_generated_round:
         try:
             ga_numbers = adaptive_overlap_ga(previous_numbers_sets)
             update_recommendation(next_round, "Adaptive Overlap 3Rounds", ga_numbers)
-            last_generated_round = next_round
+            update_last_generated_round(next_round)
             return f"✅ {next_round}회차 Adaptive Overlap (3 rounds) 조합 생성 완료", 200
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
