@@ -26,7 +26,7 @@ def fetch_current_round():
     sheet_id = "1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo"
     sheet = client.open_by_key(sheet_id).worksheet("Actual22")
     round_no = int(sheet.acell('B2').value)
-    actual_numbers = sheet.acell('C2').value
+    actual_numbers = sheet.acell('C2').value.replace(" ", "")  # 공백 제거 추가
     return round_no, actual_numbers
 
 # GA 모델 실행 및 최적화된 번호 생성
