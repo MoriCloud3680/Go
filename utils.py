@@ -14,8 +14,8 @@ def authenticate_google():
 def fetch_current_round():
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
-    round_no = int(sheet.acell('B2').value)
-    actual_numbers = sheet.acell('C2').value.replace(" ", "")
+    round_no = int(sheet.acell('A2').value)
+    actual_numbers = sheet.acell('B2').value.replace(" ", "")
     return round_no, actual_numbers
 
 def get_last_generated_round():
