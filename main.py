@@ -1,34 +1,32 @@
-from flask import Flask
-from utils import fetch_current_round, update_recommendations, get_last_generated_round, update_last_generated_round
+import os
+import json
 import random
+import gspread
+from flask import Flask
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
 
 app = Flask(__name__)
 
-def ga_recent_best(actual_numbers):
-    recent_nums = [int(n) for n in actual_numbers.split(",")]
-    fixed_nums = random.sample(recent_nums, 5)
-    remaining_pool = [n for n in range(1, 71) if n not in fixed_nums]
-    random_nums = random.sample(remaining_pool, 5)
-    combined_nums = sorted(fixed_nums + random_nums)
-    return ",".join([f"{num:02d}" for num in combined_nums])
+last_generated_round = None
 
-@app.route("/", methods=["GET"])
-def home():
-    current_round, actual_numbers = fetch_current_round()
-    next_round = current_round + 1
+# 구글 인증 함수
+def authenticate_google():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    credentials_dict = json.loads(os.getenv('GOOGLE_CREDENTIALS'))
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+    client = gspread.authorize(creds)
+    return client
 
-    last_generated_round = get_last_generated_round()
+# 최신 회차 번호 및 데이터 가져오기
+def fetch_current_round():
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
+    round_no = int(sheet.acell('A2').value)
+    actual_numbers = sheet.acell('B2').value.replace(" ", "")
+    return round_no, actual_numbers
 
-    if next_round != last_generated_round:
-        try:
-            numbers = ga_recent_best(actual_numbers)
-            update_recommendations(next_round, numbers, "GA Recent5 Best")
-            update_last_generated_round(next_round)
-            return f"✅ {next_round}회차 조합 생성 완료: {numbers}", 200
-        except Exception as e:
-            return f"❌ 오류 발생: {str(e)}", 500
-    else:
-        return f"⚠️ {next_round}회차는 이미 생성 완료됨.", 200
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
+# GA Recent5 Best 조합 생성 함수
+def ga_recent5_best():
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN
