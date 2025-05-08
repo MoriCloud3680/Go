@@ -92,18 +92,27 @@ def number_analysis(numbers_history):
     generations = 50
     mutation_rate = 0.15
 
-    def generate_candidate():
-        candidate = []
-        for i in range(10):
-            if positional_freq[i]:
-                top_nums = [num for num, _ in positional_freq[i].most_common(3)]
-                candidate.append(random.choice(top_nums))
-            else:
-                candidate.append(random.randint(1, 70))
-        candidate = list(set(candidate))
-        while len(candidate) < 10:
-            candidate.append(random.randint(1, 70))
-        return sorted(candidate[:10])
+def generate_candidate():
+    candidate = set()
+    attempt_count = 0
+
+    while len(candidate) < 10 and attempt_count < 100:
+        attempt_count += 1
+        position = len(candidate)
+        if positional_freq[position]:
+            top_nums = [num for num, _ in positional_freq[position].most_common(3)]
+            selected_num = random.choice(top_nums)
+        else:
+            selected_num = random.randint(1, 70)
+
+        candidate.add(selected_num)
+
+    # 안전장치: 만약 후보가 부족하면 랜덤 숫자 추가
+    while len(candidate) < 10:
+        candidate.add(random.randint(1, 70))
+
+    return sorted(candidate)
+
 
     population = [generate_candidate() for _ in range(population_size)]
 
