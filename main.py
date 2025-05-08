@@ -5,8 +5,7 @@ from flask import Flask
 from oauth2client.service_account import ServiceAccountCredentials
 import random
 from functools import lru_cache
-from itertools import combinations
-from collections import Counter
+from collections import Counter, defaultdict
 from sklearn.cluster import KMeans
 import numpy as np
 
@@ -19,7 +18,7 @@ def authenticate_google():
     creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     return gspread.authorize(creds)
 
-def fetch_latest_rounds(n=20):
+def fetch_latest_rounds(n=30):
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
     data = sheet.get(f'A2:B{n+1}')
@@ -44,22 +43,23 @@ def update_recommendation(round_no, tag, numbers):
     numbers_str = ",".join(map(str, numbers))
     f10_sheet.insert_row([round_no, tag, numbers_str], 2, value_input_option="USER_ENTERED")
 
-# 번호 군집화와 위치별 빈도 분석
-
+# 정확도 높은 번호 군집화와 위치별 빈도 분석
 def number_clustering_and_positional_freq(numbers_history):
-    flat_numbers = [num for round_nums in numbers_history for num in round_nums]
-    number_counts = Counter(flat_numbers)
-
-    num_array = np.array(flat_numbers).reshape(-1, 1)
-    kmeans = KMeans(n_clusters=5, random_state=42).fit(num_array)
-    clusters = {i: [] for i in range(5)}
-    for num, label in zip(flat_numbers, kmeans.labels_):
-        clusters[label].append(num)
-
     positional_freq = [Counter() for _ in range(22)]
+    num_occurrences = defaultdict(int)
+
     for round_nums in numbers_history:
         for position, num in enumerate(round_nums):
             positional_freq[position][num] += 1
+            num_occurrences[num] += 1
+
+    num_array = np.array(list(num_occurrences.keys())).reshape(-1, 1)
+    num_weights = np.array(list(num_occurrences.values()))
+    kmeans = KMeans(n_clusters=5, random_state=42).fit(num_array, sample_weight=num_weights)
+
+    clusters = defaultdict(list)
+    for num, label in zip(num_occurrences.keys(), kmeans.labels_):
+        clusters[label].append(num)
 
     return clusters, positional_freq
 
@@ -68,20 +68,20 @@ def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq):
 
     def fitness(candidate):
         overlap = len(set(candidate) & all_prev_nums)
-        cluster_score = sum(any(num in cluster for num in candidate) for cluster in clusters.values())
+        cluster_score = sum(any(num in clusters[label] for num in candidate) for label in clusters)
         positional_score = sum(positional_freq[i][num] for i, num in enumerate(candidate) if num in positional_freq[i])
         return overlap + cluster_score + positional_score if 4 <= overlap <= 6 else -100
 
     population_size = 100
-    generations = 30
-    mutation_rate = 0.1
+    generations = 50
+    mutation_rate = 0.15
 
     def generate_candidate():
         candidate = []
         for i in range(10):
             if positional_freq[i]:
-                top_nums = positional_freq[i].most_common(5)
-                candidate.append(random.choice(top_nums)[0])
+                top_nums = [num for num, _ in positional_freq[i].most_common(3)]
+                candidate.append(random.choice(top_nums))
             else:
                 candidate.append(random.randint(1, 70))
         candidate = list(set(candidate))
@@ -125,9 +125,9 @@ def home():
         try:
             clusters, positional_freq = number_clustering_and_positional_freq(previous_numbers_sets)
             ga_numbers = adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq)
-            update_recommendation(next_round, "GA+Cluster+PosFreq", ga_numbers)
+            update_recommendation(next_round, "GA+EnhancedCluster+PosFreq", ga_numbers)
             update_last_generated_round(next_round)
-            return f"✅ {next_round}회차 GA+Cluster+PosFreq 조합 생성 완료", 200
+            return f"✅ {next_round}회차 GA+EnhancedCluster+PosFreq 조합 생성 완료", 200
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
     else:
