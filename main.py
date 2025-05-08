@@ -67,24 +67,22 @@ def number_analysis(numbers_history):
     recent_numbers = numbers_history[:5]
     recent_flat = [num for nums in recent_numbers for num in nums]
     recent_counts = Counter(recent_flat)
-    hot_numbers = [num for num, cnt in recent_counts.items() if cnt >= 3]
-    cold_numbers = [num for num, cnt in recent_counts.items() if cnt == 1]
+    hot_numbers = [num for num, cnt in recent_counts.items() if cnt >= 4]
+    cold_numbers = [num for num in range(1, 71) if recent_counts[num] == 0]
 
     # 번호 간격 분석
     gaps = {num: current_round_idx - last_seen_round[num] for num in range(1, 71)}
 
     return clusters, positional_freq, hot_numbers, cold_numbers, gaps
 
-    def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers, gaps):
+def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers, gaps):
     all_prev_nums = set().union(*previous_numbers_sets)
 
     def fitness(candidate):
         overlap = len(set(candidate) & all_prev_nums)
         cluster_score = sum(any(num in clusters[label] for num in candidate) for label in clusters)
         positional_score = sum(positional_freq[i][num] for i, num in enumerate(candidate) if num in positional_freq[i])
-        # 미세 조정한 Hot/Cold 가중치
         hot_cold_score = sum(3 if num in hot_numbers else -1 if num in cold_numbers else 0 for num in candidate)
-        # 간격 가중치를 더 작은 값으로 조정
         gap_score = sum(gaps[num] for num in candidate) * 0.05
         return (overlap + cluster_score + positional_score + hot_cold_score + gap_score) if 4 <= overlap <= 6 else -100
 
@@ -92,27 +90,20 @@ def number_analysis(numbers_history):
     generations = 50
     mutation_rate = 0.15
 
-def generate_candidate():
-    candidate = set()
-    attempt_count = 0
-
-    while len(candidate) < 10 and attempt_count < 100:
-        attempt_count += 1
-        position = len(candidate)
-        if positional_freq[position]:
-            top_nums = [num for num, _ in positional_freq[position].most_common(3)]
-            selected_num = random.choice(top_nums)
-        else:
-            selected_num = random.randint(1, 70)
-
-        candidate.add(selected_num)
-
-    # 안전장치: 만약 후보가 부족하면 랜덤 숫자 추가
-    while len(candidate) < 10:
-        candidate.add(random.randint(1, 70))
-
-    return sorted(candidate)
-
+    def generate_candidate():
+        candidate = set()
+        attempts = 0
+        while len(candidate) < 10 and attempts < 100:
+            position = len(candidate)
+            if positional_freq[position]:
+                top_nums = [num for num, _ in positional_freq[position].most_common(3)]
+                candidate.add(random.choice(top_nums))
+            else:
+                candidate.add(random.randint(1, 70))
+            attempts += 1
+        while len(candidate) < 10:
+            candidate.add(random.randint(1, 70))
+        return sorted(candidate)
 
     population = [generate_candidate() for _ in range(population_size)]
 
