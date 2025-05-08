@@ -75,16 +75,18 @@ def number_analysis(numbers_history):
 
     return clusters, positional_freq, hot_numbers, cold_numbers, gaps
 
-def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers, gaps):
+    def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers, gaps):
     all_prev_nums = set().union(*previous_numbers_sets)
 
     def fitness(candidate):
         overlap = len(set(candidate) & all_prev_nums)
         cluster_score = sum(any(num in clusters[label] for num in candidate) for label in clusters)
         positional_score = sum(positional_freq[i][num] for i, num in enumerate(candidate) if num in positional_freq[i])
-        hot_cold_score = sum(2 if num in hot_numbers else -1 if num in cold_numbers else 0 for num in candidate)
-        gap_score = sum(gaps[num] for num in candidate)
-        return (overlap + cluster_score + positional_score + hot_cold_score + (gap_score * 0.1)) if 4 <= overlap <= 6 else -100
+        # 미세 조정한 Hot/Cold 가중치
+        hot_cold_score = sum(3 if num in hot_numbers else -1 if num in cold_numbers else 0 for num in candidate)
+        # 간격 가중치를 더 작은 값으로 조정
+        gap_score = sum(gaps[num] for num in candidate) * 0.05
+        return (overlap + cluster_score + positional_score + hot_cold_score + gap_score) if 4 <= overlap <= 6 else -100
 
     population_size = 100
     generations = 50
