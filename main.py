@@ -43,15 +43,18 @@ def update_recommendation(round_no, tag, numbers):
     numbers_str = ",".join(map(str, numbers))
     f10_sheet.insert_row([round_no, tag, numbers_str], 2, value_input_option="USER_ENTERED")
 
-# 번호 군집화, 위치별 빈도, Hot/Cold 번호 분석 추가
+# 번호 군집화, 위치별 빈도, Hot/Cold 번호 및 번호 간격 분석 추가
 def number_analysis(numbers_history):
     positional_freq = [Counter() for _ in range(22)]
     num_occurrences = defaultdict(int)
+    last_seen_round = defaultdict(lambda: -100)
+    current_round_idx = len(numbers_history)
 
-    for round_nums in numbers_history:
+    for idx, round_nums in enumerate(numbers_history):
         for position, num in enumerate(round_nums):
             positional_freq[position][num] += 1
             num_occurrences[num] += 1
+            last_seen_round[num] = idx
 
     num_array = np.array(list(num_occurrences.keys())).reshape(-1, 1)
     num_weights = np.array(list(num_occurrences.values()))
@@ -61,16 +64,18 @@ def number_analysis(numbers_history):
     for num, label in zip(num_occurrences.keys(), kmeans.labels_):
         clusters[label].append(num)
 
-    # 직전 5회차 Hot/Cold 분석
     recent_numbers = numbers_history[:5]
     recent_flat = [num for nums in recent_numbers for num in nums]
     recent_counts = Counter(recent_flat)
     hot_numbers = [num for num, cnt in recent_counts.items() if cnt >= 3]
     cold_numbers = [num for num, cnt in recent_counts.items() if cnt == 1]
 
-    return clusters, positional_freq, hot_numbers, cold_numbers
+    # 번호 간격 분석
+    gaps = {num: current_round_idx - last_seen_round[num] for num in range(1, 71)}
 
-def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers):
+    return clusters, positional_freq, hot_numbers, cold_numbers, gaps
+
+def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers, gaps):
     all_prev_nums = set().union(*previous_numbers_sets)
 
     def fitness(candidate):
@@ -78,7 +83,8 @@ def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_nu
         cluster_score = sum(any(num in clusters[label] for num in candidate) for label in clusters)
         positional_score = sum(positional_freq[i][num] for i, num in enumerate(candidate) if num in positional_freq[i])
         hot_cold_score = sum(2 if num in hot_numbers else -1 if num in cold_numbers else 0 for num in candidate)
-        return overlap + cluster_score + positional_score + hot_cold_score if 4 <= overlap <= 6 else -100
+        gap_score = sum(gaps[num] for num in candidate)
+        return (overlap + cluster_score + positional_score + hot_cold_score + (gap_score * 0.1)) if 4 <= overlap <= 6 else -100
 
     population_size = 100
     generations = 50
@@ -131,11 +137,11 @@ def home():
 
     if next_round != last_generated_round:
         try:
-            clusters, positional_freq, hot_numbers, cold_numbers = number_analysis(previous_numbers_sets)
-            ga_numbers = adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers)
-            update_recommendation(next_round, "GA+Cluster+PosFreq+HotCold", ga_numbers)
+            clusters, positional_freq, hot_numbers, cold_numbers, gaps = number_analysis(previous_numbers_sets)
+            ga_numbers = adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq, hot_numbers, cold_numbers, gaps)
+            update_recommendation(next_round, "GA+Cluster+PosFreq+HotCold+Gaps", ga_numbers)
             update_last_generated_round(next_round)
-            return f"✅ {next_round}회차 GA+Cluster+PosFreq+HotCold 조합 생성 완료", 200
+            return f"✅ {next_round}회차 GA+Cluster+PosFreq+HotCold+Gaps 조합 생성 완료", 200
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
     else:
