@@ -6,6 +6,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 import random
 from functools import lru_cache
 from itertools import combinations
+from collections import Counter
+from sklearn.cluster import KMeans
+import numpy as np
 
 app = Flask(__name__)
 
@@ -16,7 +19,7 @@ def authenticate_google():
     creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
     return gspread.authorize(creds)
 
-def fetch_latest_rounds(n=3):
+def fetch_latest_rounds(n=20):
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
     data = sheet.get(f'A2:B{n+1}')
@@ -41,25 +44,50 @@ def update_recommendation(round_no, tag, numbers):
     numbers_str = ",".join(map(str, numbers))
     f10_sheet.insert_row([round_no, tag, numbers_str], 2, value_input_option="USER_ENTERED")
 
-# 분석한 번호쌍 빈도수 데이터를 기반으로 번호 쌍 연관성 정의 (실제 분석된 빈도수로 반영 필요)
-frequent_pairs = {(pair[0], pair[1]) for pair in [(1,2), (3,4), (5,6)]} # 예시 데이터 실제 분석된 번호로 변경 필요
+# 번호 군집화와 위치별 빈도 분석
 
-def adaptive_overlap_ga(previous_numbers_sets, frequent_pairs):
+def number_clustering_and_positional_freq(numbers_history):
+    flat_numbers = [num for round_nums in numbers_history for num in round_nums]
+    number_counts = Counter(flat_numbers)
+
+    num_array = np.array(flat_numbers).reshape(-1, 1)
+    kmeans = KMeans(n_clusters=5, random_state=42).fit(num_array)
+    clusters = {i: [] for i in range(5)}
+    for num, label in zip(flat_numbers, kmeans.labels_):
+        clusters[label].append(num)
+
+    positional_freq = [Counter() for _ in range(22)]
+    for round_nums in numbers_history:
+        for position, num in enumerate(round_nums):
+            positional_freq[position][num] += 1
+
+    return clusters, positional_freq
+
+def adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq):
     all_prev_nums = set().union(*previous_numbers_sets)
 
     def fitness(candidate):
         overlap = len(set(candidate) & all_prev_nums)
-        pair_score = sum(1 for pair in combinations(candidate, 2) if pair in frequent_pairs)
-        return overlap + pair_score if 4 <= overlap <= 6 else -100
+        cluster_score = sum(any(num in cluster for num in candidate) for cluster in clusters.values())
+        positional_score = sum(positional_freq[i][num] for i, num in enumerate(candidate) if num in positional_freq[i])
+        return overlap + cluster_score + positional_score if 4 <= overlap <= 6 else -100
 
     population_size = 100
     generations = 30
     mutation_rate = 0.1
 
     def generate_candidate():
-        overlap_nums = random.sample(list(all_prev_nums), random.choice([4, 5, 6]))
-        remaining_nums = random.sample([n for n in range(1, 71) if n not in overlap_nums], 10 - len(overlap_nums))
-        return sorted(overlap_nums + remaining_nums)
+        candidate = []
+        for i in range(10):
+            if positional_freq[i]:
+                top_nums = positional_freq[i].most_common(5)
+                candidate.append(random.choice(top_nums)[0])
+            else:
+                candidate.append(random.randint(1, 70))
+        candidate = list(set(candidate))
+        while len(candidate) < 10:
+            candidate.append(random.randint(1, 70))
+        return sorted(candidate[:10])
 
     population = [generate_candidate() for _ in range(population_size)]
 
@@ -95,10 +123,11 @@ def home():
 
     if next_round != last_generated_round:
         try:
-            ga_numbers = adaptive_overlap_ga(previous_numbers_sets, frequent_pairs)
-            update_recommendation(next_round, "Adaptive GA + Pair Frequency", ga_numbers)
+            clusters, positional_freq = number_clustering_and_positional_freq(previous_numbers_sets)
+            ga_numbers = adaptive_overlap_ga(previous_numbers_sets, clusters, positional_freq)
+            update_recommendation(next_round, "GA+Cluster+PosFreq", ga_numbers)
             update_last_generated_round(next_round)
-            return f"✅ {next_round}회차 Adaptive GA + Pair Frequency 조합 생성 완료", 200
+            return f"✅ {next_round}회차 GA+Cluster+PosFreq 조합 생성 완료", 200
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
     else:
