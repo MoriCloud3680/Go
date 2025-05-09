@@ -1,120 +1,111 @@
+import os
+import json
+import gspread
 from flask import Flask
-from itertools import combinations
-from collections import Counter
-from utils import authenticate_google, fetch_latest_rounds, get_last_generated_round, update_last_generated_round, update_recommendations
-import traceback
-import random  # 추가
+from oauth2client.service_account import ServiceAccountCredentials
+import random
+from functools import lru_cache
 
 app = Flask(__name__)
 
-def find_pairwise_relations(numbers_history):
-    pair_relations = {}
-    for i in range(len(numbers_history) - 1):
-        current_round_nums = numbers_history[i]
-        next_round_nums = numbers_history[i + 1]
-        for pair in combinations(current_round_nums, 2):
-            if pair not in pair_relations:
-                pair_relations[pair] = Counter()
-            pair_relations[pair].update(next_round_nums)
-    return pair_relations
+@lru_cache(maxsize=1)
+def authenticate_google():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    credentials_dict = json.loads(os.getenv('GOOGLE_CREDENTIALS'))
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(credentials_dict, scope)
+    return gspread.authorize(creds)
 
-def recommend_pairwise(prev_round_nums, pair_relations, top_n=10):
-    recommended_counter = Counter()
-    prev_pairs = combinations(prev_round_nums, 2)
-    
-    for pair in prev_pairs:
-        if pair in pair_relations:
-            recommended_counter.update(pair_relations[pair])
+def fetch_latest_rounds(n=3):
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
+    data = sheet.get(f'A2:B{n+1}')
+    rounds_numbers = [list(map(int, row[1].replace(" ", "").split(","))) for row in data if len(row) > 1]
+    current_round = int(data[0][0])
+    return current_round, rounds_numbers
 
-    # 만약 페어링 기반 추천이 없다면, 전체 가장 빈도 높은 번호를 사용
-    if not recommended_counter:
-        # 최근 회차의 전체 번호 빈도 집계 (페어 관계가 없을 때 대비용)
-        all_numbers = [num for nums in pair_relations.values() for num in nums]
-        recommended_counter = Counter(all_numbers)
-    
-    # 그래도 번호가 없으면 임의로 번호를 생성
-    if not recommended_counter:
-        return random.sample(range(1, 71), top_n)
+def get_last_confirmed_round():
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Status")
+    last_round = sheet.acell('A2').value
+    return int(last_round) if last_round else 0
 
-    recommended_numbers = [num for num, _ in recommended_counter.most_common(top_n)]
-    return recommended_numbers
+def update_last_confirmed_round(round_no):
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Status")
+    sheet.update('A2', [[str(round_no)]])
 
-    recommended_numbers = [num for num, _ in recommended_counter.most_common(top_n)]
-    return recommended_numbers
+def update_recommendation(round_no, tag, numbers):
+    client = authenticate_google()
+    f10_sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("F10")
+    numbers_str = ",".join(map(str, numbers))
+    f10_sheet.insert_row([round_no, tag, numbers_str], 2, value_input_option="USER_ENTERED")
 
-@app.route("/", methods=["GET"])
-def home():
-    current_round, previous_numbers_sets = fetch_latest_rounds(n=30)
-    next_round = current_round + 1
-    last_generated_round = get_last_generated_round()
+def adaptive_overlap_ga(previous_numbers_sets):
+    all_prev_nums = set().union(*previous_numbers_sets)
 
-    if next_round != last_generated_round:
-        try:
-            pair_relations = find_pairwise_relations(previous_numbers_sets)
-            prev_round_numbers = previous_numbers_sets[0]  # 직전 1회차만 참조
-            recommended_numbers = recommend_pairwise(prev_round_numbers, pair_relations)
+    optimal_overlap = random.choice([3, 4, 5, 6, 7])
 
-            update_recommendations(next_round, recommended_numbers, "Pairwise Strategy")
-            update_last_generated_round(next_round)
+    def fitness(candidate):
+        overlap = len(set(candidate) & all_prev_nums)
+        if overlap == optimal_overlap:
+            return 10
+        else:
+            return -abs(overlap - optimal_overlap)
 
-            return f"✅ {next_round}회차 Pairwise 전략 조합 생성 완료: {recommended_numbers}", 200
-        except Exception as e:
-            detailed_error = traceback.format_exc()
-            return f"❌ 오류 발생: {str(e)}<br><pre>{detailed_error}</pre>", 500
-    else:
-        return f"⚠️ {next_round}회차 이미 생성됨", 200
+    population_size = 150
+    generations = 40
+    mutation_rate = 0.1
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)
-from itertools import combinations
-from collections import Counter
-from utils import authenticate_google, fetch_latest_rounds, get_last_generated_round, update_last_generated_round, update_recommendations
-import traceback
+    def generate_candidate():
+        overlap_nums = random.sample(list(all_prev_nums), optimal_overlap)
+        remaining_nums = random.sample([n for n in range(1, 71) if n not in overlap_nums], 10 - len(overlap_nums))
+        return sorted(overlap_nums + remaining_nums)
 
-app = Flask(__name__)
+    population = [generate_candidate() for _ in range(population_size)]
 
-def find_pairwise_relations(numbers_history):
-    pair_relations = {}
-    for i in range(len(numbers_history) - 1):
-        current_round_nums = numbers_history[i]
-        next_round_nums = numbers_history[i + 1]
-        for pair in combinations(current_round_nums, 2):
-            if pair not in pair_relations:
-                pair_relations[pair] = Counter()
-            pair_relations[pair].update(next_round_nums)
-    return pair_relations
+    for _ in range(generations):
+        population.sort(key=fitness, reverse=True)
+        next_generation = population[:10]
 
-def recommend_pairwise(prev_round_nums, pair_relations, top_n=10):
-    recommended_counter = Counter()
-    prev_pairs = combinations(prev_round_nums, 2)
-    for pair in prev_pairs:
-        if pair in pair_relations:
-            recommended_counter.update(pair_relations[pair])
+        while len(next_generation) < population_size:
+            parents = random.sample(population[:30], 2)
+            cross_point = random.randint(3, 7)
+            child = parents[0][:cross_point] + parents[1][cross_point:]
+            child = list(set(child))
 
-    recommended_numbers = [num for num, _ in recommended_counter.most_common(top_n)]
-    return recommended_numbers
+            if random.random() < mutation_rate:
+                child[random.randint(0, len(child)-1)] = random.randint(1, 70)
+
+            while len(child) < 10:
+                num = random.randint(1, 70)
+                if num not in child:
+                    child.append(num)
+
+            next_generation.append(sorted(child))
+
+        population = next_generation
+
+    return sorted(max(population, key=fitness))
 
 @app.route("/", methods=["GET"])
 def home():
-    current_round, previous_numbers_sets = fetch_latest_rounds(n=30)
-    next_round = current_round + 1
-    last_generated_round = get_last_generated_round()
+    current_round, previous_numbers_sets = fetch_latest_rounds()
+    last_confirmed_round = get_last_confirmed_round()
 
-    if next_round != last_generated_round:
+    if current_round != last_confirmed_round:
         try:
-            pair_relations = find_pairwise_relations(previous_numbers_sets)
-            prev_round_numbers = previous_numbers_sets[0]  # 직전 1회차만 참조
-            recommended_numbers = recommend_pairwise(prev_round_numbers, pair_relations)
+            ga_numbers1 = adaptive_overlap_ga(previous_numbers_sets)
+            ga_numbers2 = adaptive_overlap_ga(previous_numbers_sets)
 
-            update_recommendations(next_round, recommended_numbers, "Pairwise Strategy")
-            update_last_generated_round(next_round)
+            update_recommendation(current_round + 1, "Adaptive Overlap Dynamic #1", ga_numbers1)
+            update_recommendation(current_round + 1, "Adaptive Overlap Dynamic #2", ga_numbers2)
 
-            return f"✅ {next_round}회차 Pairwise 전략 조합 생성 완료: {recommended_numbers}", 200
+            update_last_confirmed_round(current_round)
+            return f"✅ {current_round + 1}회차 Adaptive Overlap (Dynamic) 조합 2개 생성 완료", 200
         except Exception as e:
-            detailed_error = traceback.format_exc()
-            return f"❌ 오류 발생: {str(e)}<br><pre>{detailed_error}</pre>", 500
+            return f"❌ 오류 발생: {str(e)}", 500
     else:
-        return f"⚠️ {next_round}회차 이미 생성됨", 200
+        return f"⚠️ {current_round + 1}회차 이미 생성됨", 200
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=10000)
