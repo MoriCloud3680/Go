@@ -3,7 +3,6 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-from utils import fetch_latest_rounds, update_recommendations, get_last_generated_round, update_last_generated_round
 
 def authenticate_google():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -18,6 +17,14 @@ def fetch_current_round():
     round_no = int(sheet.acell('A2').value)
     actual_numbers = sheet.acell('B2').value.replace(" ", "")
     return round_no, actual_numbers
+
+def fetch_latest_rounds(n=30):
+    client = authenticate_google()
+    sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Actual22")
+    data = sheet.get(f'A2:B{n+1}')
+    rounds_numbers = [list(map(int, row[1].replace(" ", "").split(","))) for row in data if len(row) > 1]
+    current_round = int(data[0][0])
+    return current_round, rounds_numbers
 
 def get_last_generated_round():
     client = authenticate_google()
