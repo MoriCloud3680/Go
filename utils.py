@@ -39,5 +39,7 @@ def update_last_generated_round(round_no):
 
 def update_recommendations(round_no, numbers, tag):
     client = authenticate_google()
-    f10_sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("F10")
-    f10_sheet.insert_row([round_no, tag, numbers], 2, value_input_option="USER_ENTERED")
+    f10_sheet = client.open_by_key("YOUR_SHEET_KEY").worksheet("F10")
+    numbers_str = ",".join(map(str, numbers))
+    f10_sheet.insert_row([round_no, tag, numbers_str], 2, value_input_option="USER_ENTERED")
+
