@@ -20,9 +20,23 @@ def find_pairwise_relations(numbers_history):
 def recommend_pairwise(prev_round_nums, pair_relations, top_n=10):
     recommended_counter = Counter()
     prev_pairs = combinations(prev_round_nums, 2)
+    
     for pair in prev_pairs:
         if pair in pair_relations:
             recommended_counter.update(pair_relations[pair])
+
+    # 만약 페어링 기반 추천이 없다면, 전체 가장 빈도 높은 번호를 사용
+    if not recommended_counter:
+        # 최근 회차의 전체 번호 빈도 집계 (페어 관계가 없을 때 대비용)
+        all_numbers = [num for nums in pair_relations.values() for num in nums]
+        recommended_counter = Counter(all_numbers)
+    
+    # 그래도 번호가 없으면 임의로 번호를 생성
+    if not recommended_counter:
+        return random.sample(range(1, 71), top_n)
+
+    recommended_numbers = [num for num, _ in recommended_counter.most_common(top_n)]
+    return recommended_numbers
 
     recommended_numbers = [num for num, _ in recommended_counter.most_common(top_n)]
     return recommended_numbers
