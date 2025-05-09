@@ -50,7 +50,7 @@ def home():
         return f"⚠️ {next_round}회차 이미 생성됨", 200
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=10000)from flask import Flask
+    app.run(host='0.0.0.0', port=10000)
 from itertools import combinations
 from collections import Counter
 from utils import authenticate_google, fetch_latest_rounds, get_last_generated_round, update_last_generated_round, update_recommendations
