@@ -3,6 +3,7 @@ import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+from utils import fetch_latest_rounds, update_recommendations, get_last_generated_round, update_last_generated_round
 
 def authenticate_google():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
