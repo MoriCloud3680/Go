@@ -3,6 +3,7 @@ from itertools import combinations
 from collections import Counter
 from utils import authenticate_google, fetch_latest_rounds, get_last_generated_round, update_last_generated_round, update_recommendations
 import traceback
+import random  # 추가
 
 app = Flask(__name__)
 
