@@ -43,7 +43,7 @@ if next_round != last_generated_round:
         prev_round_numbers = previous_numbers_sets[0]  # 직전 1회차만 참조
         recommended_numbers = recommend_pairwise(prev_round_numbers, pair_relations)
 
-        update_recommendation(next_round, "Pairwise Strategy", recommended_numbers)
+        update_recommendations(next_round, recommended_numbers, "Pairwise Strategy")
         update_last_generated_round(next_round)
 
         print(f"✅ {next_round}회차 Pairwise 전략 조합 생성 완료: {recommended_numbers}")
