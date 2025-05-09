@@ -4,6 +4,8 @@ import gspread
 from flask import Flask
 from oauth2client.service_account import ServiceAccountCredentials
 import random
+from itertools import combinations
+from collections import Counter
 from functools import lru_cache
 
 app = Flask(__name__)
@@ -42,7 +44,6 @@ def update_recommendation(round_no, tag, numbers):
 
 def adaptive_overlap_ga(previous_numbers_sets):
     all_prev_nums = set().union(*previous_numbers_sets)
-
     optimal_overlap = random.choice([3, 4, 5, 6, 7])
 
     def fitness(candidate):
@@ -87,6 +88,24 @@ def adaptive_overlap_ga(previous_numbers_sets):
 
     return sorted(max(population, key=fitness))
 
+def pairwise_strategy(prev_round_nums, previous_numbers_sets):
+    pair_relations = {}
+    for nums in previous_numbers_sets[1:]:
+        for pair in combinations(nums, 2):
+            if pair not in pair_relations:
+                pair_relations[pair] = Counter()
+            pair_relations[pair].update(nums)
+
+    recommended_counter = Counter()
+    for pair in combinations(prev_round_nums, 2):
+        if pair in pair_relations:
+            recommended_counter.update(pair_relations[pair])
+
+    if recommended_counter:
+        return [num for num, _ in recommended_counter.most_common(10)]
+    else:
+        return random.sample(range(1, 71), 10)
+
 @app.route("/", methods=["GET"])
 def home():
     current_round, previous_numbers_sets = fetch_latest_rounds()
@@ -94,18 +113,15 @@ def home():
 
     if current_round != last_confirmed_round:
         try:
-            # 중복실행 방지를 위해 먼저 회차를 업데이트
             update_last_confirmed_round(current_round)
 
-            # 첫 번째 GA 조합 생성 및 업데이트
-            ga_numbers1 = adaptive_overlap_ga(previous_numbers_sets)
-            update_recommendation(current_round + 1, "Adaptive Overlap Dynamic #1", ga_numbers1)
+            pairwise_numbers = pairwise_strategy(previous_numbers_sets[0], previous_numbers_sets)
+            ga_numbers = adaptive_overlap_ga(previous_numbers_sets)
 
-            # 두 번째 GA 조합 생성 및 업데이트
-            ga_numbers2 = adaptive_overlap_ga(previous_numbers_sets)
-            update_recommendation(current_round + 1, "Adaptive Overlap Dynamic #2", ga_numbers2)
+            update_recommendation(current_round + 1, "Pairwise Strategy", pairwise_numbers)
+            update_recommendation(current_round + 1, "Adaptive Overlap Dynamic", ga_numbers)
 
-            return f"✅ {current_round + 1}회차 Adaptive Overlap (Dynamic) 조합 2개 생성 완료", 200
+            return f"✅ {current_round + 1}회차 Pairwise 및 Adaptive Overlap 조합 생성 완료", 200
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
     else:
