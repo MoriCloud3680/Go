@@ -31,7 +31,7 @@ def get_last_generated_round():
 def update_last_generated_round(round_no):
     client = authenticate_google()
     sheet = client.open_by_key("1P-kCWRZk0YJFokgQuwVpxg_dKz78xN0PqwBmgtf63fo").worksheet("Status")
-    sheet.update('A2', str(round_no))
+    sheet.update(values=[[str(round_no)]], range_name='A2')
 
 def update_recommendations(round_no, numbers, tag):
     client = authenticate_google()
