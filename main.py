@@ -90,21 +90,35 @@ def adaptive_overlap_ga(previous_numbers_sets):
 
 def pairwise_strategy(prev_round_nums, previous_numbers_sets):
     pair_relations = {}
-    for nums in previous_numbers_sets[1:]:
-        for pair in combinations(nums, 2):
+    # 이전 회차 데이터로 페어 관계 생성
+    for i in range(len(previous_numbers_sets) - 1):
+        current_nums = previous_numbers_sets[i]
+        next_nums = previous_numbers_sets[i + 1]
+        for pair in combinations(current_nums, 2):
             if pair not in pair_relations:
                 pair_relations[pair] = Counter()
-            pair_relations[pair].update(nums)
+            pair_relations[pair].update(next_nums)
 
     recommended_counter = Counter()
+    # 직전 회차 번호로부터 다음 번호 추천
     for pair in combinations(prev_round_nums, 2):
         if pair in pair_relations:
             recommended_counter.update(pair_relations[pair])
 
-    if recommended_counter:
-        return [num for num, _ in recommended_counter.most_common(10)]
-    else:
-        return random.sample(range(1, 71), 10)
+    recommended_numbers = []
+    for num, _ in recommended_counter.most_common():
+        if num not in prev_round_nums and num not in recommended_numbers:
+            recommended_numbers.append(num)
+        if len(recommended_numbers) == 10:
+            break
+
+    # 만약 번호가 부족하면 랜덤 번호로 채움
+    while len(recommended_numbers) < 10:
+        rand_num = random.randint(1, 70)
+        if rand_num not in prev_round_nums and rand_num not in recommended_numbers:
+            recommended_numbers.append(rand_num)
+
+    return recommended_numbers
 
 @app.route("/", methods=["GET"])
 def home():
