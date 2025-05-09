@@ -1,6 +1,6 @@
 from itertools import combinations
 from collections import Counter
-from utils import fetch_latest_rounds, update_recommendation, get_last_generated_round, update_last_generated_round
+from utils import fetch_latest_rounds, update_recommendations, get_last_generated_round, update_last_generated_round
 
 # 나머지 전략 코드 유지
 current_round, previous_numbers_sets = fetch_latest_rounds(n=30)
