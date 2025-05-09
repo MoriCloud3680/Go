@@ -1,13 +1,9 @@
+from flask import Flask
 from itertools import combinations
 from collections import Counter
-from utils import fetch_latest_rounds, update_recommendations, get_last_generated_round, update_last_generated_round
+from utils import authenticate_google, fetch_latest_rounds, get_last_generated_round, update_last_generated_round, update_recommendations
 
-# 나머지 전략 코드 유지
-current_round, previous_numbers_sets = fetch_latest_rounds(n=30)
-
-# 이후 전략 로직 그대로 유지
-
-# Step 1: Pairwise Relation Analysis
+app = Flask(__name__)
 
 def find_pairwise_relations(numbers_history):
     pair_relations = {}
@@ -20,10 +16,6 @@ def find_pairwise_relations(numbers_history):
             pair_relations[pair].update(next_round_nums)
     return pair_relations
 
-pair_relations = find_pairwise_relations(previous_numbers_sets)
-
-# Step 2: Recommendation Based on Pairwise Relations
-
 def recommend_pairwise(prev_round_nums, pair_relations, top_n=10):
     recommended_counter = Counter()
     prev_pairs = combinations(prev_round_nums, 2)
@@ -34,21 +26,26 @@ def recommend_pairwise(prev_round_nums, pair_relations, top_n=10):
     recommended_numbers = [num for num, _ in recommended_counter.most_common(top_n)]
     return recommended_numbers
 
-# Step 3: Generate and Update Recommendations
-next_round = current_round + 1
-last_generated_round = get_last_generated_round()
+@app.route("/", methods=["GET"])
+def home():
+    current_round, previous_numbers_sets = fetch_latest_rounds(n=30)
+    next_round = current_round + 1
+    last_generated_round = get_last_generated_round()
 
-if next_round != last_generated_round:
-    try:
-        prev_round_numbers = previous_numbers_sets[0]  # 직전 1회차만 참조
-        recommended_numbers = recommend_pairwise(prev_round_numbers, pair_relations)
+    if next_round != last_generated_round:
+        try:
+            pair_relations = find_pairwise_relations(previous_numbers_sets)
+            prev_round_numbers = previous_numbers_sets[0]  # 직전 1회차만 참조
+            recommended_numbers = recommend_pairwise(prev_round_numbers, pair_relations)
 
-        update_recommendations(next_round, recommended_numbers, "Pairwise Strategy")
-        update_last_generated_round(next_round)
+            update_recommendations(next_round, recommended_numbers, "Pairwise Strategy")
+            update_last_generated_round(next_round)
 
-        print(f"✅ {next_round}회차 Pairwise 전략 조합 생성 완료: {recommended_numbers}")
+            return f"✅ {next_round}회차 Pairwise 전략 조합 생성 완료: {recommended_numbers}", 200
+        except Exception as e:
+            return f"❌ 오류 발생: {str(e)}", 500
+    else:
+        return f"⚠️ {next_round}회차 이미 생성됨", 200
 
-    except Exception as e:
-        print(f"❌ 오류 발생: {str(e)}")
-else:
-    print(f"⚠️ {next_round}회차 이미 생성됨")
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=10000)
