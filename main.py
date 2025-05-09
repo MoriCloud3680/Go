@@ -1,8 +1,11 @@
 from itertools import combinations
 from collections import Counter
+from utils import fetch_latest_rounds, update_recommendation, get_last_generated_round, update_last_generated_round
 
-# Function to fetch the latest rounds (already implemented)
+# 나머지 전략 코드 유지
 current_round, previous_numbers_sets = fetch_latest_rounds(n=30)
+
+# 이후 전략 로직 그대로 유지
 
 # Step 1: Pairwise Relation Analysis
 
