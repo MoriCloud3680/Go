@@ -94,13 +94,17 @@ def home():
 
     if current_round != last_confirmed_round:
         try:
-            ga_numbers1 = adaptive_overlap_ga(previous_numbers_sets)
-            ga_numbers2 = adaptive_overlap_ga(previous_numbers_sets)
+            # 중복실행 방지를 위해 먼저 회차를 업데이트
+            update_last_confirmed_round(current_round)
 
+            # 첫 번째 GA 조합 생성 및 업데이트
+            ga_numbers1 = adaptive_overlap_ga(previous_numbers_sets)
             update_recommendation(current_round + 1, "Adaptive Overlap Dynamic #1", ga_numbers1)
+
+            # 두 번째 GA 조합 생성 및 업데이트
+            ga_numbers2 = adaptive_overlap_ga(previous_numbers_sets)
             update_recommendation(current_round + 1, "Adaptive Overlap Dynamic #2", ga_numbers2)
 
-            update_last_confirmed_round(current_round)
             return f"✅ {current_round + 1}회차 Adaptive Overlap (Dynamic) 조합 2개 생성 완료", 200
         except Exception as e:
             return f"❌ 오류 발생: {str(e)}", 500
