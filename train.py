@@ -1,8 +1,3 @@
-# Colab에서 Google Sheets 연동 Attention LSTM 모델 세부 튜닝 (Render 환경변수 사용)
-
-# 패키지 설치
-!pip install numpy pandas statsmodels tensorflow keras gspread oauth2client
-
 # 라이브러리 임포트
 import os
 import json
