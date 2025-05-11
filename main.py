@@ -1,5 +1,5 @@
 from flask import Flask
-from model.train import train_and_update
+from train import train_and_update  # 수정된 import 문
 
 app = Flask(__name__)
 
