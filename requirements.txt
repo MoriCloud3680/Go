@@ -1,0 +1,9 @@
+flask
+gspread
+oauth2client
+numpy
+pandas
+tensorflow
+keras
+scikit-learn
+statsmodels
