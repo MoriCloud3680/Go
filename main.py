@@ -1,7 +1,10 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 from flask import Flask
 import numpy as np
 import pandas as pd
-from utils import fetch_latest_data, update_predictions
+from utils import fetch_latest_data, update_predictions, update_status
 import joblib
 from tensorflow.keras.models import load_model
 
@@ -9,6 +12,8 @@ app = Flask(__name__)
 
 model = load_model('model.keras', compile=False)
 scaler = joblib.load('scaler.save')
+
+# 이하 기존 코드 유지
 
 def preprocess(new_numbers):
     moving_avg = pd.Series(new_numbers).rolling(window=5).mean().bfill().values
