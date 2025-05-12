@@ -1,10 +1,10 @@
-flask
-gspread
-oauth2client
 numpy
 pandas
 tensorflow
 keras
-statsmodels
 scikit-learn
-requests
+gspread
+oauth2client
+joblib
+flask
+gunicorn
